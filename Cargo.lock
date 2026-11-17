@@ -511,6 +511,7 @@ dependencies = [
  "kit-core",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
