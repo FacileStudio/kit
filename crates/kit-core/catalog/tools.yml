@@ -745,3 +745,17 @@ tools:
         The statusbar is a singleton and claims a PID file in $XDG_RUNTIME_DIR so a
         compositor reload never stacks two bars. Do not run mako alongside the sidebar:
         both claim org.freedesktop.Notifications and the second one loses.
+
+  - name: fusible
+    summary: "Electronic linter: the fuse blows to block firmware code generation"
+    repo: FacileStudio/Fusible
+    branch: main
+    bin: fusible
+    build: rust
+    srcSubdir: .
+    asset: fusible
+    auth:
+      kind: none
+      note: >-
+        Fusible works offline on local schematic and firmware files. Its opus
+        subcommand reads the opus CLI's own credential, so it needs no login of its own.
