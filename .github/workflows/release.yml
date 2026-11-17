@@ -112,14 +112,18 @@ jobs:
           else
             notes="--generate-notes"
           fi
+          pre=""
+          case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$GITHUB_REF_NAME" \
+            $pre \
             "$notes" \
             dist/*.tar.gz dist/checksums.txt
 
   homebrew:
     needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
