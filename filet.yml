@@ -23,8 +23,9 @@ limits:
 architecture:
   requiredDirs: [crates/kit-core/src, crates/kit/src, docs]
   requiredFiles:
-    "crates/kit-core/src": [lib.rs, paths.rs, listfile.rs, nix.rs, resolve.rs]
+    "crates/kit-core/src": [lib.rs, paths.rs, listfile.rs, resolve.rs]
     "crates/kit-core/src/flathub": [mod.rs]
+    "crates/kit-core/src/nix": [mod.rs]
     "crates/kit/src": [main.rs]
 
 style:
