@@ -1,4 +1,4 @@
-# kit — Development
+# kit: Development
 
 How the workspace is laid out, how to run the gate, what CI checks, and how a release is cut.
 
