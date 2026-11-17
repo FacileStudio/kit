@@ -1,4 +1,4 @@
-# kit — Configuration
+# kit: Configuration
 
 Where kit reads and writes its files, every environment variable it reads, and how its Nix
 profile and Flathub remote are set up.

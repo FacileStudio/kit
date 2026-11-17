@@ -1,4 +1,4 @@
-# kit — Usage
+# kit: Usage
 
 Every command and flag of `kit` 0.1.0, taken from its `--help` output, with one example each.
 

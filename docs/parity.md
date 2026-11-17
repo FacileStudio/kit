@@ -1,4 +1,4 @@
-# kit — Parity
+# kit: Parity
 
 Each test of the Go `facile` installer and the Rust test in kit that carries it over.
 

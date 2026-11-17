@@ -114,5 +114,5 @@ Full reference: [docs/configuration.md](docs/configuration.md).
 
 ---
 
-Part of the [Facile Suite](https://facile.studio) — self-hosted tools for creative studios
+Part of the [Facile Suite](https://facile.studio): self-hosted tools for creative studios
 and freelancers. One login, zero cloud dependency.

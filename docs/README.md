@@ -1,4 +1,4 @@
-# kit — Documentation
+# kit: Documentation
 
 | Page | What's in it |
 |---|---|
