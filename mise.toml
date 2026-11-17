@@ -1,0 +1,12 @@
+[tools]
+rust = { version = "stable", components = "rustfmt,clippy" }
+lefthook = "latest"
+
+[tasks.check]
+run = "sh scripts/check.sh"
+
+[tasks.build]
+run = "cargo build --release"
+
+[hooks]
+postinstall = "lefthook install"

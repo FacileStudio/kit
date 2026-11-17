@@ -1,0 +1,37 @@
+# kit's coding standard, enforced by filet.
+# https://github.com/FacileStudio/filet
+#
+# filet has no Rust rule family, so this is the generic set plus the layout
+# contract. cargo clippy owns everything that needs to understand Rust.
+
+kind: cli
+
+ignore:
+  - .git
+  - target
+  - dist
+  - coverage
+
+extensions: [.rs]
+
+limits:
+  fileLines: 250
+  funcsPerFile: 8
+  lineLength: 120
+  nesting: 4
+
+architecture:
+  requiredDirs: [crates/kit-core/src, crates/kit/src, docs]
+  requiredFiles:
+    "crates/kit-core/src": [lib.rs, paths.rs, listfile.rs, flathub.rs, nix.rs, resolve.rs]
+    "crates/kit/src": [main.rs]
+
+style:
+  banInlineComments: true
+  banTODO: true
+  banTrailingSpace: true
+
+disabled:
+  - gen.line.long
+
+failOn: error

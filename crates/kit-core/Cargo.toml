@@ -1,0 +1,25 @@
+[package]
+name = "kit-core"
+description = "The library behind kit: catalog, list file and the facile, flathub and nix backends."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_yaml.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ureq.workspace = true
+sha2.workspace = true
+hex.workspace = true
+flate2.workspace = true
+tar.workspace = true
+tempfile.workspace = true
+fd-lock.workspace = true
+dirs.workspace = true
+semver.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

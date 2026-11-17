@@ -1,0 +1,747 @@
+# The Facile Studio tool catalog.
+#
+# `facile` embeds this file at build time and refreshes it from its raw URL on
+# main at runtime, so adding a tenth tool never requires anybody to reinstall
+# facile. This copy is canonical; there is no second one to keep in sync.
+#
+# The install fields mirror the config block of the per-repo install.sh by
+# design: the two must agree, and identical names make a mismatch visible.
+#
+# The auth block is transcribed from each CLI's own credential READ path. It is
+# not a preference — get one character wrong and facile writes a token the tool
+# will never find.
+#
+# Two kinds carry the word device and they are different protocols. `device` is
+# a tool's own start/poll endpoints. `oidc-device` is RFC 8628 at the shared
+# identity provider, which is what a machine whose browser lives on another
+# device needs; a tool declaring it keeps its `sso` block, because the loopback
+# flow stays the same-machine path and is what runs until the provider
+# advertises the grant. Path templates: ~ is $HOME, ${xdgConfig} is $XDG_CONFIG_HOME
+# or ~/.config, ${userConfig} is the platform-native config dir (which on macOS
+# is ~/Library/Application Support, and is what Rust's dirs::config_dir returns).
+
+version: 1
+
+# Tools whose install subcommand registers their MCP server in the agent
+# harnesses on this machine; facile runs `<bin> install` after placing each of
+# these. sonar is the first; a tool joins by shipping that subcommand and being
+# named here.
+mcp:
+  - sonar
+
+tools:
+  - name: opus
+    summary: Project management
+    repo: FacileStudio/opus-cli
+    branch: main
+    bin: opus
+    build: rust
+    srcSubdir: .
+    asset: opus
+    skill: opus
+    auth:
+      kind: token
+      defaultServerUrl: https://opus.facile.studio
+      tokenPath: /dashboard/settings/account/developer
+      transport: bearer
+      store:
+        kind: file
+        path: ~/.opus.yml
+        format: yaml
+        tokenField: api_key
+        urlField: api_url
+        mode: 0o600
+        preserve: true
+      note: >-
+        Opus mints a static API key from Settings > Account > Developer. It is
+        the only suite tool with no login endpoint to drive.
+
+  - name: sablier
+    summary: Time tracking
+    repo: FacileStudio/sablier-cli
+    branch: main
+    bin: sablier
+    build: rust
+    srcSubdir: .
+    asset: sablier
+    skill: sablier
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://sablier.facile.studio
+      apiSuffix: /api
+      discoveryPath: /auth/config
+      transport: bearer
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /auth/oidc/device/exchange
+      sso:
+        startPath: /auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /auth/oidc/exchange
+        requireState: true
+      store:
+        kind: file
+        path: ~/.sablier.yml
+        format: yaml
+        tokenField: token
+        urlField: server_url
+        mode: 0o600
+        preserve: true
+
+  - name: nuage
+    summary: Cloud storage sync
+    repo: FacileStudio/nuage-cli
+    branch: main
+    bin: nuage
+    build: rust
+    srcSubdir: .
+    asset: nuage
+    skill: nuage
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://nuage.facile.studio
+      apiSuffix: /api
+      discoveryPath: /auth/config
+      tokenPath: /settings/api
+      transport: bearer
+      envToken: NUAGE_TOKEN
+      envUrl: NUAGE_SERVER_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /auth/oidc/device/exchange
+      sso:
+        startPath: /auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /auth/oidc/exchange
+        requireState: true
+      store:
+        kind: file
+        path: ~/.nuage.yml
+        format: yaml
+        tokenField: token
+        urlField: server_url
+        mode: 0o600
+        preserve: true
+      note: >-
+        The config file also holds sync_dir, poll_interval, ignore_patterns and
+        selective_sync. Overwriting it wholesale silently resets the user's sync
+        directory, so this store is read-modify-write. tokenPath is the fallback
+        for a headless box: nuage-cli keeps a --token paste path for one.
+
+  - name: casier
+    summary: Secrets and env vars
+    repo: FacileStudio/casier-cli
+    branch: main
+    bin: casier
+    build: rust
+    srcSubdir: .
+    asset: casier
+    skill: casier
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://casier.facile.studio/api
+      apiSuffix: /api
+      discoveryPath: /auth/config
+      identityPath: /auth/me
+      transport: bearer
+      envToken: CASIER_TOKEN
+      envUrl: CASIER_SERVER_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /auth/oidc/device/exchange
+      sso:
+        startPath: /auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /auth/oidc/exchange
+        requireState: true
+      password:
+        path: /auth/login
+        withEmail: true
+        tokenField: token
+      store:
+        kind: keychain
+        keychainService: casier
+        keychainAccount: serverUrl
+        path: ${userConfig}/casier/config.toml
+        format: toml
+        urlField: server_url
+        mode: 0o644
+      note: >-
+        The token goes to the OS keychain, keyed on the server URL including
+        its /api suffix. A headless Linux box has no secret service, which is
+        exactly the machine the device sign-in exists for, so facile writes the
+        token to a 0600 file beside the config and says so — casier-cli does
+        not read that file and its own error says to set CASIER_TOKEN instead,
+        so the login prints the export line rather than leaving a token
+        somewhere nothing will look.
+
+  - name: capsule
+    summary: End-to-end encrypted paste
+    repo: FacileStudio/capsule-cli
+    branch: main
+    bin: capsule
+    build: go
+    srcSubdir: .
+    asset: capsule-cli
+    goVersionVar: github.com/FacileStudio/capsule-cli/cmd.version
+    skill: capsule
+    auth:
+      kind: none
+      note: >-
+        Capsule is zero-knowledge. There is no account, only a per-capsule
+        delete token printed when you seal one.
+
+  - name: antenne
+    summary: Alert log and delivery targets
+    repo: FacileStudio/antenne-cli
+    branch: main
+    bin: antenne
+    build: go
+    srcSubdir: .
+    asset: antenne-cli
+    goVersionVar: github.com/FacileStudio/antenne-cli/cmd.version
+    skill: antenne
+    auth:
+      kind: password
+      defaultServerUrl: https://antenne.facile.studio
+      discoveryPath: /api/session/public
+      transport: cookie
+      cookieName: antenne_session
+      envUrl: ANTENNE_URL
+      password:
+        path: /api/login
+        withEmail: false
+      store:
+        kind: file
+        path: ${xdgConfig}/antenne/config.json
+        format: json
+        tokenField: token
+        urlField: url
+        mode: 0o600
+        dirMode: 0o700
+        preserve: true
+      note: >-
+        Antenne authenticates a whole instance with one password and answers
+        with a session cookie, not a bearer token. The stored value is the
+        antenne_session cookie value.
+
+  - name: journal
+    summary: Centralized logging
+    repo: FacileStudio/journal-cli
+    branch: main
+    bin: journal
+    build: go
+    srcSubdir: .
+    asset: journal-cli
+    goVersionVar: github.com/FacileStudio/journal-cli/cmd.version
+    skill: journal
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://journal.facile.studio
+      discoveryPath: /api/auth/config
+      transport: bearer
+      envToken: JOURNAL_TOKEN
+      envUrl: JOURNAL_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /api/auth/oidc/device/exchange
+      sso:
+        startPath: /api/auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /api/auth/oidc/exchange
+        requireState: true
+      password:
+        path: /api/auth/login
+        withEmail: true
+        tokenField: token
+      store:
+        kind: file
+        path: ${xdgConfig}/journal/config.yml
+        format: yaml
+        tokenField: token
+        urlField: url
+        mode: 0o600
+        dirMode: 0o700
+        preserve: true
+      note: >-
+        Journal answers its read API with a porte session bearer token, and its
+        discovery endpoint advertises the same /api/auth/config shape as Mycelium
+        and casier, so the SSO login flow is identical. A password login reads
+        an email and a password (--email/--password); the token rides as a
+        bearer on every read. The CLI is read-only after login: ingest is the
+        Go SDK's and curl's job.
+
+  - name: courrier
+    summary: Self-hosted email
+    repo: FacileStudio/courrier-cli
+    branch: main
+    bin: courrier
+    build: go
+    srcSubdir: .
+    asset: courrier-cli
+    goVersionVar: github.com/FacileStudio/courrier-cli/cmd.version
+    skill: courrier
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://courrier.facile.studio
+      discoveryPath: /api/auth/config
+      transport: bearer
+      envToken: COURRIER_TOKEN
+      envUrl: COURRIER_SERVER_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /api/auth/oidc/device/exchange
+      sso:
+        startPath: /api/auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /api/auth/oidc/exchange
+        requireState: true
+      password:
+        path: /api/auth/login
+        withEmail: true
+        tokenField: token
+      store:
+        kind: file
+        path: ${xdgConfig}/courrier/config.yml
+        format: yaml
+        tokenField: token
+        urlField: url
+        mode: 0o600
+        dirMode: 0o700
+        preserve: true
+      note: >-
+        Courrier mounts porte under /api, so the SSO login flow is identical to
+        Journal's. Note that SSO_ONLY=true unregisters the local credential routes
+        entirely, so /api/auth/login answers 404 rather than 403 there, and
+        courrier.facile.studio runs exactly that way. The config file is YAML per
+        CLI-STANDARD 6.1 and carries a default_account key beside the token, so
+        preserve is required on write.
+  - name: sonde
+    summary: Uptime monitoring
+    repo: FacileStudio/sonde-cli
+    branch: main
+    bin: sonde
+    build: go
+    srcSubdir: .
+    asset: sonde-cli
+    goVersionVar: github.com/FacileStudio/sonde-cli/cmd.version
+    skill: sonde
+    auth:
+      kind: oidc-device
+      discoveryPath: /api/auth/config
+      transport: bearer
+      envToken: SONDE_TOKEN
+      envUrl: SONDE_SERVER_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /api/auth/oidc/device/exchange
+      sso:
+        startPath: /api/auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /api/auth/oidc/exchange
+        requireState: true
+      password:
+        path: /api/auth/login
+        withEmail: true
+        tokenField: token
+      store:
+        kind: file
+        path: ${xdgConfig}/sonde/config.yml
+        format: yaml
+        tokenField: token
+        urlField: url
+        mode: 0o600
+        dirMode: 0o700
+        preserve: true
+      note: >-
+        Sonde mounts porte under /api, so the login flows are Journal's and
+        Courrier's. There is no defaultServerUrl on purpose: every Sonde is
+        somebody's own instance and there is no shared one to guess. The CLI
+        drives the same two flows itself, so `facile login sonde` and
+        `sonde login` reach the same endpoints. Its own /api/auth/me nests the
+        account under a "user" key, which identityPath cannot read, so the
+        login names the instance rather than the person.
+
+  - name: mycelium
+    summary: Shared agent memory
+    repo: FacileStudio/Mycelium
+    branch: main
+    bin: mycelium
+    build: go
+    srcSubdir: .
+    asset: Mycelium
+    goVersionVar: github.com/FacileStudio/Mycelium/cmd.version
+    auth:
+      kind: oidc-device
+      discoveryPath: /api/auth/config
+      transport: bearer
+      envToken: MYCELIUM_TOKEN
+      envUrl: MYCELIUM_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /api/auth/oidc/device/exchange
+      sso:
+        startPath: /api/auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /api/auth/oidc/exchange
+        requireState: true
+      device:
+        startPath: /api/auth/device/start
+        pollPath: /api/auth/device/poll
+      password:
+        path: /api/auth/login
+        withEmail: false
+        tokenField: token
+      store:
+        kind: file
+        path: ~/.config/mycelium/config.yml
+        format: yaml
+        tokenField: token
+        urlField: url
+        mode: 0o600
+        preserve: true
+        extra:
+          - machine
+      note: >-
+        Mycelium also keeps space, usage_token, rule_order and agents in the same
+        file, so this store is read-modify-write. The separate usage token is
+        an Anthropic credential and is none of facile's business. Mycelium's
+        own device endpoints stay recorded here — the server serves them and
+        advertises device_enabled — but facile no longer drives them: the
+        headless path is now the identity provider's RFC 8628 grant, which is
+        one sign-in for the whole suite rather than one per tool.
+
+  - name: bulle
+    summary: Terminal coding agent
+    repo: FacileStudio/bulle
+    branch: main
+    bin: bulle
+    build: go
+    srcSubdir: apps/cli
+    asset: bulle
+    goVersionVar: main.version
+    auth:
+      kind: none
+      note: >-
+        Bulle signs in through its own `bulle login`, which opens the browser
+        against https://bulle.facile.studio and stores a token the CLI sends
+        model calls through. The provider, models and keys live on that server,
+        so there is no suite login for facile to drive and settings live in
+        ~/.config/bulle/config.yml, which facile never writes.
+
+  - name: ardoise
+    summary: Invoice and contract PDFs
+    repo: FacileStudio/ardoise-cli
+    branch: main
+    bin: ardoise
+    build: bun
+    srcSubdir: .
+    asset: ardoise
+    requires:
+      - typst
+    skill: ardoise
+    auth:
+      kind: none
+      note: Ardoise runs entirely offline and has no account.
+
+  - name: douane
+    summary: Vulnerability sweep
+    repo: FacileStudio/douane
+    branch: main
+    bin: douane
+    build: go
+    srcSubdir: .
+    asset: douane
+    goVersionVar: github.com/FacileStudio/douane/internal/version.stamp
+    auth:
+      kind: none
+      note: >-
+        Douane scans local lockfiles and queries osv.dev plus the KEV and EPSS
+        feeds directly. There is no suite server to log into and no credential
+        to store; its only network traffic is advisory lookups.
+
+  - name: encre
+    summary: Facile document format (validate and convert artifacts)
+    repo: FacileStudio/encre
+    branch: main
+    bin: encre
+    build: rust
+    srcSubdir: .
+    asset: encre
+    auth:
+      kind: none
+      note: >-
+        Offline: no server and no login. Mycelium and Bulle run it to validate
+        every artifact; without it, mycelium artifact add records the document
+        with a warning.
+
+  - name: filet
+    summary: Code-quality checker
+    repo: FacileStudio/filet
+    branch: main
+    bin: filet
+    build: go
+    srcSubdir: .
+    asset: filet
+    goVersionVar: main.version
+    skill: filet
+    auth:
+      kind: none
+      note: >-
+        filet is a static analysis tool that runs entirely offline and has no
+        account. It reads the project's .filet.yml configuration and reports
+        violations of the Facile team guidelines.
+
+  - name: agenda
+    summary: Calendar and CalDAV client
+    repo: FacileStudio/agenda-cli
+    bin: agenda
+    build: go
+    srcSubdir: .
+    asset: agenda
+    goVersionVar: github.com/FacileStudio/agenda-cli/cmd.version
+    skill: agenda
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://agenda.facile.studio
+      discoveryPath: /auth/config
+      transport: bearer
+      envToken: AGENDA_TOKEN
+      envUrl: AGENDA_SERVER_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /auth/oidc/device/exchange
+      sso:
+        startPath: /auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /auth/oidc/exchange
+        requireState: true
+      store:
+        kind: file
+        path: ${userConfig}/agenda/config.yml
+        format: yaml
+        tokenField: token
+        urlField: server_url
+        mode: 0o600
+        preserve: true
+
+  - name: boite
+    summary: Development sandbox manager
+    repo: FacileStudio/boite
+    branch: master
+    bin: boite
+    build: go
+    srcSubdir: .
+    asset: boite
+    goVersionVar: github.com/FacileStudio/boite/cmd.version
+    requires:
+      - qemu-system-x86_64
+    auth:
+      kind: none
+      note: >-
+        Boite manages local virtual machines via QEMU/KVM. It runs entirely
+        locally and has no suite server to log into and no credential to store.
+
+  - name: tiroir
+    summary: Encrypted env manager applied into a shell
+    repo: FacileStudio/tiroir
+    branch: master
+    bin: tiroir
+    build: go
+    srcSubdir: .
+    asset: tiroir
+    goVersionVar: github.com/FacileStudio/tiroir/cmd.Version
+    auth:
+      kind: none
+      note: >-
+        tiroir keeps shell variables encrypted at rest in ~/.tiroir (0600) keyed
+        by a sibling ~/.tiroir.key. It manages env for boite VMs and, standalone,
+        can replace skatos in a config. `tiroir export` emits `export KEY=value`
+        statements the shell applies directly, so the store lands in the current
+        shell's environment. No server, no login, no credential to store.
+        Successor to skatos.
+
+  - name: sonar
+    summary: Multi-engine web search
+    repo: FacileStudio/sonar
+    branch: main
+    bin: sonar
+    build: go
+    srcSubdir: .
+    asset: sonar
+    goVersionVar: github.com/FacileStudio/sonar/cmd.version
+    skill: sonar
+    auth:
+      kind: none
+      note: >-
+        sonar is a local multi-engine web search CLI querying keyed APIs
+        (brave/exa/tavily/firecrawl/serpapi), a self-hosted SearXNG (furet) and
+        scrape fallbacks (bing/ddg), with throttle/breaker/cache to dodge
+        IP-based blocking; config ~/.config/sonar/config.yml, keys via env or
+        tiroir; no server, no login.
+
+  - name: gare
+    summary: Zero-daemon Podman and Kubernetes GitOps orchestrator
+    repo: FacileStudio/gare
+    branch: main
+    bin: gare
+    build: go
+    srcSubdir: cmd/gare
+    asset: gare
+    goVersionVar: main.version
+    requires:
+      - podman
+      - caddy
+    auth:
+      kind: none
+      note: >-
+        Gare orchestrates rootless Podman and Kubernetes workloads via systemd user
+        units and Caddy ingress. It runs locally without an external suite server account.
+
+  - name: diapo
+    summary: Slides as one text file
+    repo: FacileStudio/Diapo
+    branch: main
+    bin: diapo
+    build: rust
+    srcSubdir: apps/cli
+    asset: diapo
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://diapo.facile.studio
+      apiSuffix: /api
+      discoveryPath: /auth/config
+      identityPath: /auth/me
+      transport: bearer
+      envToken: DIAPO_TOKEN
+      envUrl: DIAPO_SERVER_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /auth/oidc/device/exchange
+      sso:
+        startPath: /auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /auth/oidc/exchange
+        requireState: true
+      store:
+        kind: file
+        path: ${xdgConfig}/diapo/config.yml
+        format: yaml
+        tokenField: token
+        urlField: server_url
+        mode: 0o600
+        dirMode: 0o700
+        preserve: true
+
+  - name: clap
+    summary: Video as one text file
+    repo: FacileStudio/Clap
+    branch: main
+    bin: clap
+    build: rust
+    srcSubdir: apps/cli
+    asset: clap
+    auth:
+      kind: oidc-device
+      defaultServerUrl: https://clap.facile.studio
+      apiSuffix: /api
+      discoveryPath: /auth/config
+      identityPath: /auth/me
+      transport: bearer
+      envToken: CLAP_TOKEN
+      envUrl: CLAP_SERVER_URL
+      oidcDevice:
+        issuer: https://sso.facile.studio
+        clientId: facile-cli
+        scopes: openid profile email
+        exchangePath: /auth/oidc/device/exchange
+      sso:
+        startPath: /auth/oidc
+        portParam: port
+        stateParam: cli_state
+        extraParams: flow=cli
+        callbackWith: code
+        callbackPath: /
+        exchangePath: /auth/oidc/exchange
+        requireState: true
+      store:
+        kind: file
+        path: ${xdgConfig}/clap/config.yml
+        format: yaml
+        tokenField: token
+        urlField: server_url
+        mode: 0o600
+        dirMode: 0o700
+        preserve: true
+
+  - name: widgets
+    summary: "Wayland desktop widgets: statusbar, sidebar and launcher"
+    repo: saravenpi/widgets
+    branch: main
+    bin: statusbar
+    bins:
+      - statusbar
+      - sidebar
+      - launcher
+    build: rust
+    srcSubdir: .
+    auth:
+      kind: none
+      note: >-
+        The statusbar is a singleton and claims a PID file in $XDG_RUNTIME_DIR so a
+        compositor reload never stacks two bars. Do not run mako alongside the sidebar:
+        both claim org.freedesktop.Notifications and the second one loses.
