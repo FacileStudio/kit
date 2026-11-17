@@ -1,0 +1,153 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.os_name }}/${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            os_name: linux
+            arch: amd64
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            os_name: linux
+            arch: arm64
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            os_name: darwin
+            arch: amd64
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            os_name: darwin
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: mlugg/setup-zig@v2
+        if: matrix.os_name == 'linux'
+
+      - uses: taiki-e/install-action@v2
+        if: matrix.os_name == 'linux'
+        with:
+          tool: cargo-zigbuild
+
+      - name: Build (linux)
+        if: matrix.os_name == 'linux'
+        run: cargo zigbuild --release --locked --bin kit --target ${{ matrix.target }}
+
+      - name: Build (darwin)
+        if: matrix.os_name == 'darwin'
+        run: cargo build --release --locked --bin kit --target ${{ matrix.target }}
+
+      - name: Package
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          archive="kit_${version}_${{ matrix.os_name }}_${{ matrix.arch }}.tar.gz"
+          stage="$(mktemp -d)"
+          cp "target/${{ matrix.target }}/release/kit" README.md LICENSE "$stage/"
+          mkdir -p dist
+          tar -czf "dist/$archive" -C "$stage" kit README.md LICENSE
+          tar -tzf "dist/$archive"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kit-${{ matrix.os_name }}-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum kit_*.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Extract release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pattern="$(printf '%s' "$version" | sed 's/\./\\./g')"
+          touch notes.md
+          if [ -f CHANGELOG.md ]; then
+            RE="^## \\[?v?${pattern}\\]?( |\$)" awk '
+              /^## / { if (found) exit; if ($0 ~ ENVIRON["RE"]) { found = 1; next } }
+              found { print }
+            ' CHANGELOG.md > notes.md
+          fi
+          cat notes.md
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [ -s notes.md ]; then
+            notes="--notes-file=notes.md"
+          else
+            notes="--generate-notes"
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            "$notes" \
+            dist/*.tar.gz dist/checksums.txt
+
+  homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern checksums.txt
+
+      - name: Write the cask
+        run: sh scripts/cask.sh "${GITHUB_REF_NAME#v}" checksums.txt > kit.rb
+
+      - name: Push the cask to the tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          git clone -q "https://x-access-token:${TAP_TOKEN}@github.com/FacileStudio/homebrew-tap.git" tap
+          mkdir -p tap/Casks
+          cp kit.rb tap/Casks/kit.rb
+          cd tap
+          git config user.name goreleaserbot
+          git config user.email bot@goreleaser.com
+          git add Casks/kit.rb
+          if git diff --cached --quiet; then
+            echo "Casks/kit.rb already at ${version}"
+            exit 0
+          fi
+          git commit -q -m "Brew cask update for kit version v${version}"
+          git push -q origin HEAD:main
