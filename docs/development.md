@@ -101,6 +101,8 @@ cargo test --workspace --locked -- --ignored
 - writes `Casks/kit.rb` with `scripts/cask.sh` and pushes it to `FacileStudio/homebrew-tap`,
   using the `HOMEBREW_TAP_GITHUB_TOKEN` secret
 
+A tag with a hyphen, such as `v0.2.0-rc.1`, is published as a prerelease and skips the cask.
+
 Check the release has 4 archives plus `checksums.txt`:
 
 ```sh
