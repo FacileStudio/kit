@@ -1,28 +1,13 @@
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
-use std::process::{Command, Output};
-use std::time::Duration;
+use std::process::Command;
 
 use super::pathutil::which;
 use super::FacileError;
 
-const MAX_FAILURE_LINES: usize = 20;
-const TEXT_FILE_BUSY: i32 = 26;
+pub(crate) use crate::proc::output;
 
-/// Runs a command, retrying briefly while the executable is busy.
-///
-/// A binary written a moment ago can still be open for writing in a child another thread forked.
-pub(crate) fn output(cmd: &mut Command) -> std::io::Result<Output> {
-    for _ in 0..50 {
-        match cmd.output() {
-            Err(e) if e.raw_os_error() == Some(TEXT_FILE_BUSY) => {
-                std::thread::sleep(Duration::from_millis(10))
-            }
-            other => return other,
-        }
-    }
-    cmd.output()
-}
+const MAX_FAILURE_LINES: usize = 20;
 
 /// Runs a build step. On failure the error carries the tail of the log, where the cause and summary sit.
 pub(crate) fn run(cmd: &mut Command) -> Result<(), FacileError> {

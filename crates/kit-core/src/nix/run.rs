@@ -27,13 +27,10 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let out = Command::new(bin)
-        .args(args)
-        .output()
-        .map_err(|e| match e.kind() {
-            ErrorKind::NotFound => NixError::NotAvailable(bin.display().to_string()),
-            _ => NixError::Io(e),
-        })?;
+    let out = crate::proc::output(Command::new(bin).args(args)).map_err(|e| match e.kind() {
+        ErrorKind::NotFound => NixError::NotAvailable(bin.display().to_string()),
+        _ => NixError::Io(e),
+    })?;
     if !out.status.success() {
         return Err(NixError::CommandFailed {
             command: label.to_string(),

@@ -10,13 +10,12 @@ const STDERR_TAIL_LINES: usize = 10;
 
 /// Runs `bin` with `args`, stdin closed, and returns stdout on a zero exit.
 pub fn run(bin: &Path, args: &[&str]) -> Result<String, FlathubError> {
-    let output = Command::new(bin)
-        .args(args)
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|err| match err.kind() {
-            ErrorKind::NotFound => FlathubError::NotAvailable,
-            _ => FlathubError::Io(err),
+    let output =
+        crate::proc::output(Command::new(bin).args(args).stdin(Stdio::null())).map_err(|err| {
+            match err.kind() {
+                ErrorKind::NotFound => FlathubError::NotAvailable,
+                _ => FlathubError::Io(err),
+            }
         })?;
     if output.status.success() {
         return Ok(String::from_utf8_lossy(&output.stdout).into_owned());

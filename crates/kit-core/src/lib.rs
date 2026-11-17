@@ -6,4 +6,5 @@ pub mod flathub;
 pub mod listfile;
 pub mod nix;
 pub mod paths;
+mod proc;
 pub mod resolve;
