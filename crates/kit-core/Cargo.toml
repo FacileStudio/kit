@@ -20,6 +20,8 @@ tempfile.workspace = true
 fd-lock.workspace = true
 dirs.workspace = true
 semver.workspace = true
+regex = "1"
+toml = { version = "0.8", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
 tempfile.workspace = true
